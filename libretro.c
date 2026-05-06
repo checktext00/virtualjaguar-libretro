@@ -8,6 +8,7 @@
 #include <compat/posix_string.h>
 #include <compat/strl.h>
 
+#include "bus_arbiter.h"
 #include "cheat.h"
 #include "file.h"
 #include "jagbios.h"
@@ -297,6 +298,20 @@ static void check_variables(void)
       else
          vjs.useFastBlitter = false;
    }
+
+   var.key = "virtualjaguar_bus_contention";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         vjs.useBusContention = true;
+      else
+         vjs.useBusContention = false;
+   }
+   else
+      vjs.useBusContention = true;
+   busArbiter.enabled = vjs.useBusContention ? 1 : 0;
 
    var.key = "virtualjaguar_bios";
    var.value = NULL;
@@ -847,6 +862,7 @@ bool retro_load_game(const struct retro_game_info *info)
    /* Register EEPROM dirty callback so the save buffer stays in sync */
    eeprom_dirty_cb = eeprom_pack_save_buf;
 
+   bus_arbiter_init();
    JaguarInit();                                             // set up hardware
    memcpy(jagMemSpace + 0xE00000, jaguarBootROM, 0x20000); // Use the stock BIOS
 
@@ -1032,6 +1048,7 @@ void retro_init(void)
 
 void retro_deinit(void)
 {
+   bus_arbiter_reset();
    libretro_supports_bitmasks = false;
 
    /* Belt-and-suspenders: shut down emulator subsystems if the frontend
